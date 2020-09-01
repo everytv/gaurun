@@ -159,8 +159,8 @@ func LogPush(id uint64, status, token string, ptime float64, req RequestGaurunNo
 		subtitle = zap.String("subtitle", req.Subtitle)
 	}
 	badge := zap.Skip()
-	if req.Badge != 0 {
-		badge = zap.Int("badge", req.Badge)
+	if req.Badge != nil {
+		badge = zap.Int("badge", *req.Badge)
 	}
 	category := zap.Skip()
 	if req.Category != "" {
