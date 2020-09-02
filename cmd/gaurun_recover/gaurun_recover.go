@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mercari/gaurun/gaurun"
-	"github.com/mercari/gaurun/gcm"
+	"github.com/everytv/gaurun/gaurun"
+	"github.com/everytv/gaurun/gcm"
 )
 
 var (
@@ -42,7 +42,7 @@ func pushNotification(wg *sync.WaitGroup, req gaurun.RequestGaurunNotification, 
 
 func pushNotificationAndroid(req gaurun.RequestGaurunNotification) bool {
 	data := map[string]interface{}{"message": req.Message}
-	msg := gcm.NewMessage(data, req.Tokens...)
+	msg := gcm.NewMessage(data, map[string]interface{}{}, req.Tokens...)
 	msg.CollapseKey = req.CollapseKey
 	msg.DelayWhileIdle = req.DelayWhileIdle
 	msg.TimeToLive = req.TimeToLive

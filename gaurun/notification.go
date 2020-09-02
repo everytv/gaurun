@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mercari/gaurun/gcm"
+	"github.com/everytv/gaurun/gcm"
 
 	"go.uber.org/zap"
 )
@@ -28,6 +28,7 @@ type RequestGaurunNotification struct {
 	CollapseKey    string `json:"collapse_key,omitempty"`
 	DelayWhileIdle bool   `json:"delay_while_idle,omitempty"`
 	TimeToLive     int    `json:"time_to_live,omitempty"`
+	Notification   map[string]interface{} `json:"notification,omitempty"`
 	// iOS
 	Title            string       `json:"title,omitempty"`
 	Subtitle         string       `json:"subtitle,omitempty"`
@@ -128,7 +129,7 @@ func pushNotificationAndroid(req RequestGaurunNotification) error {
 
 	token := req.Tokens[0]
 
-	msg := gcm.NewMessage(data, token)
+	msg := gcm.NewMessage(data, req.Notification, token)
 	msg.CollapseKey = req.CollapseKey
 	msg.DelayWhileIdle = req.DelayWhileIdle
 	msg.TimeToLive = req.TimeToLive
