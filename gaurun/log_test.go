@@ -28,9 +28,10 @@ func BenchmarkLogPushIOSOmitempty(b *testing.B) {
 }
 
 func BenchmarkLogPushIOSFull(b *testing.B) {
+	badge := 1
 	req := RequestGaurunNotification{
 		Platform:         PlatFormIos,
-		Badge:            1,
+		Badge:            &badge,
 		Sound:            "foo",
 		ContentAvailable: true,
 		Expiry:           100,

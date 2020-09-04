@@ -32,7 +32,7 @@ type RequestGaurunNotification struct {
 	// iOS
 	Title            string       `json:"title,omitempty"`
 	Subtitle         string       `json:"subtitle,omitempty"`
-	Badge            int          `json:"badge,omitempty"`
+	Badge            *int         `json:"badge,omitempty"`
 	Category         string       `json:"category,omitempty"`
 	Sound            string       `json:"sound,omitempty"`
 	ContentAvailable bool         `json:"content_available,omitempty"`
