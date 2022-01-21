@@ -91,7 +91,7 @@ func TestSend(t *testing.T) {
 			t.Fatalf("Failed to setup sender client: %s", err)
 		}
 
-		msg := NewMessage(map[string]interface{}{"key": "value"}, "1")
+		msg := NewMessage(map[string]interface{}{"key": "value"}, map[string]interface{}{}, "1")
 		_, err = sender.Send(msg)
 
 		if err != nil {
