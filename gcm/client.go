@@ -11,7 +11,7 @@ import (
 const (
 	// FCMSendEndpoint is the endpoint for sending message to the Firebase Cloud Messaging (FCM) server.
 	// See more on https://firebase.google.com/docs/cloud-messaging/server
-	FCMSendEndpoint = "https://fcm.googleapis.com/fcm/send"
+	FCMSendEndpoint = "https://fcm.googleapis.com/v1/projects/delish-kitchen-dev/messages:send"
 )
 
 const (
@@ -38,6 +38,8 @@ type Client struct {
 	ApiKey string
 	URL    string
 	Http   *http.Client
+
+	apiKeyLoader *ApiKeyLoader
 }
 
 // NewClient returns a new sender with the given URL and apiKey.
@@ -61,6 +63,9 @@ func NewClient(urlString, apiKey string) (*Client, error) {
 		URL:    urlString,
 		ApiKey: apiKey,
 		Http:   http.DefaultClient,
+
+		// 無理やりな実装だが、APIキーは別の箇所で生成されている仕様とする
+		apiKeyLoader: NewApiKeyLoader(),
 	}, nil
 }
 
@@ -75,7 +80,31 @@ func (c *Client) Send(msg *Message) (*Response, error) {
 	return c.send(msg)
 }
 
+type messageOuter struct {
+	Message messageInner `json:"message"`
+}
+
+type messageInner struct {
+	Token        string                 `json:"token"`
+	Data         map[string]interface{} `json:"data"`
+	Notification map[string]interface{} `json:"notification"`
+}
+
 func (c *Client) send(msg *Message) (*Response, error) {
+	if len(msg.RegistrationIDs) == 0 {
+		return nil, nil
+	}
+	msgOuter := &messageOuter{
+		Message: messageInner{
+			Token:        msg.RegistrationIDs[0],
+			Data:         msg.Data,
+			Notification: msg.Notification,
+		},
+	}
+	return c.send0(msgOuter)
+}
+
+func (c *Client) send0(msg *messageOuter) (*Response, error) {
 	var buf bytes.Buffer
 	encoder := json.NewEncoder(&buf)
 	if err := encoder.Encode(msg); err != nil {
@@ -86,7 +115,12 @@ func (c *Client) send(msg *Message) (*Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Authorization", fmt.Sprintf("key=%s", c.ApiKey))
+	apiKey, err := c.apiKeyLoader.Load()
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := c.Http.Do(req)
