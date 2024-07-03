@@ -5,9 +5,9 @@ import (
 )
 
 // Message is used by the application server to send a message to
-// the GCM server. See the documentation for GCM Architectural
+// the FCM server. See the documentation for FCM Architectural
 // Overview for more information:
-// http://developer.android.com/google/gcm/gcm.html#send-msg
+// https://firebase.google.com/docs/cloud-messaging/http-server-ref
 type Message struct {
 	RegistrationIDs       []string               `json:"registration_ids"`
 	CollapseKey           string                 `json:"collapse_key,omitempty"`
@@ -15,6 +15,7 @@ type Message struct {
 	DelayWhileIdle        bool                   `json:"delay_while_idle,omitempty"`
 	Notification          map[string]interface{} `json:"notification,omitempty"`
 	TimeToLive            int                    `json:"time_to_live,omitempty"`
+	Priority              string                 `json:"priority,omitempty"`
 	RestrictedPackageName string                 `json:"restricted_package_name,omitempty"`
 	DryRun                bool                   `json:"dry_run,omitempty"`
 }
@@ -49,6 +50,10 @@ func (m *Message) validate() error {
 			"the message's TimeToLive field must be an integer between 0 and %d (4 weeks)",
 			maxTimeToLive,
 		)
+	}
+
+	if m.Priority != "" && m.Priority != fcmPushPriorityHigh && m.Priority != fcmPushPriorityNormal {
+		return fmt.Errorf("priority must be %s or %s", fcmPushPriorityHigh, fcmPushPriorityNormal)
 	}
 
 	return nil

@@ -1,13 +1,14 @@
 package gaurun
 
 import (
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"runtime"
 	"strconv"
 	"sync/atomic"
 
-	"github.com/BurntSushi/toml"
+	"github.com/pelletier/go-toml"
 )
 
 type ConfToml struct {
@@ -18,13 +19,14 @@ type ConfToml struct {
 }
 
 type SectionCore struct {
-	Port            string `toml:"port"`
-	WorkerNum       int64  `toml:"workers"`
-	QueueNum        int64  `toml:"queues"`
-	NotificationMax int64  `toml:"notification_max"`
-	PusherMax       int64  `toml:"pusher_max"`
-	ShutdownTimeout int64  `toml:"shutdown_timeout"`
-	Pid             string `toml:"pid"`
+	Port               string `toml:"port"`
+	WorkerNum          int64  `toml:"workers"`
+	QueueNum           int64  `toml:"queues"`
+	NotificationMax    int64  `toml:"notification_max"`
+	PusherMax          int64  `toml:"pusher_max"`
+	ShutdownTimeout    int64  `toml:"shutdown_timeout"`
+	Pid                string `toml:"pid"`
+	AllowsEmptyMessage bool   `toml:"allows_empty_message"`
 }
 
 type SectionAndroid struct {
@@ -34,13 +36,16 @@ type SectionAndroid struct {
 	KeepAliveTimeout int    `toml:"keepalive_timeout"`
 	KeepAliveConns   int    `toml:"keepalive_conns"`
 	RetryMax         int    `toml:"retry_max"`
-	UseFCM           bool   `toml:"use_fcm"`
 }
 
 type SectionIos struct {
 	Enabled          bool   `toml:"enabled"`
 	PemCertPath      string `toml:"pem_cert_path"`
 	PemKeyPath       string `toml:"pem_key_path"`
+	PemKeyPassphrase string `toml:"pem_key_passphrase"`
+	TokenAuthKeyPath string `toml:"token_auth_key_path"`
+	TokenAuthKeyID   string `toml:"token_auth_key_id"`
+	TokenAuthTeamID  string `toml:"token_auth_team_id"`
 	Sandbox          bool   `toml:"sandbox"`
 	RetryMax         int    `toml:"retry_max"`
 	Timeout          int    `toml:"timeout"`
@@ -67,6 +72,7 @@ func BuildDefaultConf() ConfToml {
 	conf.Core.PusherMax = 0
 	conf.Core.ShutdownTimeout = 10
 	conf.Core.Pid = ""
+	conf.Core.AllowsEmptyMessage = false
 	// Android
 	conf.Android.ApiKey = ""
 	conf.Android.Enabled = true
@@ -74,11 +80,13 @@ func BuildDefaultConf() ConfToml {
 	conf.Android.KeepAliveTimeout = 90
 	conf.Android.KeepAliveConns = numCPU
 	conf.Android.RetryMax = 1
-	conf.Android.UseFCM = false
 	// iOS
 	conf.Ios.Enabled = true
 	conf.Ios.PemCertPath = ""
 	conf.Ios.PemKeyPath = ""
+	conf.Ios.TokenAuthKeyPath = ""
+	conf.Ios.TokenAuthKeyID = ""
+	conf.Ios.TokenAuthTeamID = ""
 	conf.Ios.Sandbox = true
 	conf.Ios.RetryMax = 1
 	conf.Ios.Timeout = 5
@@ -93,7 +101,11 @@ func BuildDefaultConf() ConfToml {
 }
 
 func LoadConf(confGaurun ConfToml, confPath string) (ConfToml, error) {
-	_, err := toml.DecodeFile(confPath, &confGaurun)
+	doc, err := ioutil.ReadFile(confPath)
+	if err != nil {
+		return confGaurun, err
+	}
+	err = toml.Unmarshal(doc, &confGaurun)
 	if err != nil {
 		return confGaurun, err
 	}
@@ -141,4 +153,12 @@ func ConfigPushersHandler(w http.ResponseWriter, r *http.Request) {
 	atomic.StoreInt64(&ConfGaurun.Core.PusherMax, newPusherMax)
 
 	sendResponse(w, "ok", http.StatusOK)
+}
+
+func (s *SectionIos) IsTokenBasedProvider() bool {
+	return s.TokenAuthKeyPath != "" && s.TokenAuthKeyID != "" && s.TokenAuthTeamID != ""
+}
+
+func (s *SectionIos) IsCertificateBasedProvider() bool {
+	return s.PemCertPath != "" && s.PemKeyPath != ""
 }

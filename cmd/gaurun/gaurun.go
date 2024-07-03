@@ -13,7 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/everytv/gaurun/gaurun"
+	"github.com/mercari/gaurun/buford/token"
+	"github.com/mercari/gaurun/gaurun"
 )
 
 const (
@@ -72,25 +73,37 @@ func main() {
 	gaurun.LogError = errorLogger
 
 	if !gaurun.ConfGaurun.Ios.Enabled && !gaurun.ConfGaurun.Android.Enabled {
-		gaurun.LogSetupFatal(fmt.Errorf("What do you want to do?"))
+		gaurun.LogSetupFatal(fmt.Errorf("no platform has been enabled"))
 	}
 
 	if gaurun.ConfGaurun.Ios.Enabled {
-		gaurun.CertificatePemIos.Cert, err = ioutil.ReadFile(gaurun.ConfGaurun.Ios.PemCertPath)
-		if err != nil {
-			gaurun.LogSetupFatal(fmt.Errorf("A certification file for iOS is not found."))
+		if gaurun.ConfGaurun.Ios.IsCertificateBasedProvider() && gaurun.ConfGaurun.Ios.IsTokenBasedProvider() {
+			gaurun.LogSetupFatal(fmt.Errorf("you can use only one of certificate-based provider or token-based provider connection trust"))
 		}
 
-		gaurun.CertificatePemIos.Key, err = ioutil.ReadFile(gaurun.ConfGaurun.Ios.PemKeyPath)
-		if err != nil {
-			gaurun.LogSetupFatal(fmt.Errorf("A key file for iOS is not found."))
-		}
+		if gaurun.ConfGaurun.Ios.IsCertificateBasedProvider() {
+			_, err = ioutil.ReadFile(gaurun.ConfGaurun.Ios.PemCertPath)
+			if err != nil {
+				gaurun.LogSetupFatal(fmt.Errorf("the certification file for iOS was not found"))
+			}
 
+			_, err = ioutil.ReadFile(gaurun.ConfGaurun.Ios.PemKeyPath)
+			if err != nil {
+				gaurun.LogSetupFatal(fmt.Errorf("the key file for iOS was not found"))
+			}
+		} else if gaurun.ConfGaurun.Ios.IsTokenBasedProvider() {
+			_, err = token.AuthKeyFromFile(gaurun.ConfGaurun.Ios.TokenAuthKeyPath)
+			if err != nil {
+				gaurun.LogSetupFatal(fmt.Errorf("the auth key file for iOS was not loading: %v", err))
+			}
+		} else {
+			gaurun.LogSetupFatal(fmt.Errorf("the key file or APNsAuthKey file for iOS was not found"))
+		}
 	}
 
 	if gaurun.ConfGaurun.Android.Enabled {
 		if gaurun.ConfGaurun.Android.ApiKey == "" {
-			gaurun.LogSetupFatal(fmt.Errorf("APIKey for Android is empty."))
+			gaurun.LogSetupFatal(fmt.Errorf("the APIKey for Android cannot be empty"))
 		}
 	}
 
@@ -127,6 +140,7 @@ func main() {
 			gaurun.LogSetupFatal(fmt.Errorf("failed to init http client for APNs: %v", err))
 		}
 	}
+
 	gaurun.InitStat()
 	gaurun.StartPushWorkers(gaurun.ConfGaurun.Core.WorkerNum, gaurun.ConfGaurun.Core.QueueNum)
 
@@ -179,13 +193,10 @@ func main() {
 }
 
 func signalHandler(ch <-chan os.Signal, sighupFn func()) {
-	for {
-		select {
-		case sig := <-ch:
-			switch sig {
-			case syscall.SIGHUP:
-				sighupFn()
-			}
+	for sig := range ch {
+		switch sig {
+		case syscall.SIGHUP:
+			sighupFn()
 		}
 	}
 }

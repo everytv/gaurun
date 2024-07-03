@@ -10,7 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/everytv/gaurun/gcm"
+	"github.com/mercari/gaurun/buford/push"
+	"github.com/mercari/gaurun/gcm"
 
 	"go.uber.org/zap"
 )
@@ -21,17 +22,20 @@ type RequestGaurun struct {
 
 type RequestGaurunNotification struct {
 	// Common
-	Tokens   []string `json:"token"`
-	Platform int      `json:"platform"`
-	Message  string   `json:"message"`
+	Tokens     []string `json:"token"`
+	Platform   int      `json:"platform"`
+	Message    string   `json:"message"`
+	Identifier string   `json:"identifier,omitempty"`
 	// Android
 	CollapseKey    string `json:"collapse_key,omitempty"`
 	DelayWhileIdle bool   `json:"delay_while_idle,omitempty"`
 	TimeToLive     int    `json:"time_to_live,omitempty"`
+	Priority       string `json:"priority,omitempty"`
 	Notification   map[string]interface{} `json:"notification,omitempty"`
 	// iOS
 	Title            string       `json:"title,omitempty"`
 	Subtitle         string       `json:"subtitle,omitempty"`
+	PushType         string       `json:"push_type,omitempty"`
 	Badge            *int         `json:"badge,omitempty"`
 	Category         string       `json:"category,omitempty"`
 	Sound            string       `json:"sound,omitempty"`
@@ -94,7 +98,12 @@ func pushNotificationIos(req RequestGaurunNotification) error {
 
 	token := req.Tokens[0]
 
-	headers := NewApnsHeadersHttp2(&req)
+	var headers *push.Headers
+	if APNSClient.Token != nil {
+		headers = NewApnsHeadersHttp2WithToken(&req, APNSClient.Token)
+	} else {
+		headers = NewApnsHeadersHttp2(&req)
+	}
 	payload := NewApnsPayloadHttp2(&req)
 
 	stime := time.Now()
@@ -133,22 +142,16 @@ func pushNotificationAndroid(req RequestGaurunNotification) error {
 	msg.CollapseKey = req.CollapseKey
 	msg.DelayWhileIdle = req.DelayWhileIdle
 	msg.TimeToLive = req.TimeToLive
+	msg.Priority = req.Priority
 
 	stime := time.Now()
-	resp, err := GCMClient.SendNoRetry(msg)
+	_, err := GCMClient.Send(msg)
 	etime := time.Now()
 	ptime := etime.Sub(stime).Seconds()
 	if err != nil {
 		atomic.AddInt64(&StatGaurun.Android.PushError, 1)
 		LogPush(req.ID, StatusFailedPush, token, ptime, req, err)
 		return err
-	}
-
-	if resp.Failure > 0 {
-		atomic.AddInt64(&StatGaurun.Android.PushSuccess, int64(resp.Success))
-		atomic.AddInt64(&StatGaurun.Android.PushError, int64(resp.Failure))
-		LogPush(req.ID, StatusFailedPush, token, ptime, req, errors.New(resp.Results[0].Error))
-		return errors.New(resp.Results[0].Error)
 	}
 
 	LogPush(req.ID, StatusSucceededPush, token, ptime, req, nil)
@@ -171,8 +174,14 @@ func validateNotification(notification *RequestGaurunNotification) error {
 		return errors.New("invalid platform")
 	}
 
-	if len(notification.Message) == 0 {
+	if !ConfGaurun.Core.AllowsEmptyMessage && len(notification.Message) == 0 {
 		return errors.New("empty message")
+	}
+
+	if notification.PushType != "" {
+		if notification.PushType != ApnsPushTypeAlert && notification.PushType != ApnsPushTypeBackground {
+			return fmt.Errorf("push_type must be %s or %s", ApnsPushTypeAlert, ApnsPushTypeBackground)
+		}
 	}
 
 	return nil
@@ -218,8 +227,8 @@ func PushNotificationHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if ConfGaurun.Log.Level == "debug" {
-		reqBody, err := ioutil.ReadAll(r.Body)
-		if err != nil {
+		reqBody, ierr := ioutil.ReadAll(r.Body)
+		if ierr != nil {
 			sendResponse(w, "failed to read request-body", http.StatusInternalServerError)
 			return
 		}

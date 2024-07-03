@@ -1,13 +1,11 @@
 package gcm
 
-// Response represents the GCM server's response to the application
-// server's sent message. See the documentation for GCM Architectural
+// Response represents the FCM server's response to the application
+// server's sent message. See the documentation for FCM Architectural
 // Overview for more information:
-// http://developer.android.com/google/gcm/gcm.html#send-msg
+// https://firebase.google.com/docs/cloud-messaging/http-server-ref
 type Response struct {
 	MulticastID  int64    `json:"multicast_id"`
-	Success      int      `json:"success"`
-	Failure      int      `json:"failure"`
 	CanonicalIDs int      `json:"canonical_ids"`
 	Results      []Result `json:"results"`
 }
