@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 )
 
-const (
-	// FCMSendEndpoint is the endpoint for sending message to the Firebase Cloud Messaging (FCM) server.
-	// See more on https://firebase.google.com/docs/cloud-messaging/server
-	FCMSendEndpoint = "https://fcm.googleapis.com/v1/projects/delish-kitchen-dev/messages:send"
-)
+// FCMSendEndpoint is the endpoint for sending message to the Firebase Cloud Messaging (FCM) server.
+// See more on https://firebase.google.com/docs/cloud-messaging/server
+func FCMSendEndpoint() string {
+	return fmt.Sprintf("https://fcm.googleapis.com/v1/projects/%s/messages:send", os.Getenv("GCM_PROJECT"))
+}
 
 const (
 	// fcmPushPriorityHigh and fcmPushPriorityNormal is priority of a delivery message options

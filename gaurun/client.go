@@ -30,7 +30,7 @@ func keepAliveInterval(keepAliveTimeout int) int {
 // InitGCMClient initializes GCMClient which is globally declared.
 func InitGCMClient() error {
 	var err error
-	GCMClient, err = gcm.NewClient(gcm.FCMSendEndpoint, ConfGaurun.Android.ApiKey)
+	GCMClient, err = gcm.NewClient(gcm.FCMSendEndpoint(), ConfGaurun.Android.ApiKey)
 	if err != nil {
 		return err
 	}
